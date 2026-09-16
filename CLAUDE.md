@@ -160,6 +160,7 @@ mantriScore += 500;   // Always
 | room_joined        | { roomCode, playerId, players }                    | Joiner only     |
 | room_update        | { players, playerCount, hostId }                   | All in room     |
 | game_started       | { gameState, roundNumber }                         | All in room     |
+| phase_changed      | { gameState }  — sent on every phase transition   | All in room     |
 | role_assigned      | { role, points }                                   | Each privately  |
 | raja_revealed      | { rajaPlayerId, rajaName }                         | All in room     |
 | sipahi_revealed    | { sipahiPlayerId, sipahiName }                     | All in room     |
@@ -213,7 +214,7 @@ export interface RoundResult {
   mantriId: string;
   sipahiId: string;
   chorId: string;
-  guessedPlayerId: string;
+  guessedPlayerId: string | null;  // null when the 15s timer expired (counts as wrong)
   correct: boolean;
   roundScores: Record<string, number>;
 }

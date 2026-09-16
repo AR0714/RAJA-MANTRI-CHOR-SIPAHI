@@ -3,6 +3,8 @@ import express, { type Request, type Response } from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { Server } from 'socket.io';
+import { GameManager } from './game/GameManager';
+import { registerHandlers, type GameServer } from './socket/handlers';
 
 dotenv.config();
 
@@ -18,23 +20,24 @@ const app = express();
 app.use(cors({ origin: CLIENT_URL }));
 app.use(express.json());
 
+const gameManager = new GameManager();
+
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', uptime: process.uptime(), timestamp: new Date().toISOString() });
+  res.json({
+    status: 'ok',
+    uptime: process.uptime(),
+    rooms: gameManager.roomCount,
+    timestamp: new Date().toISOString(),
+  });
 });
 
 const httpServer = http.createServer(app);
 
-const io = new Server(httpServer, {
+const io: GameServer = new Server(httpServer, {
   cors: { origin: CLIENT_URL, methods: ['GET', 'POST'] },
 });
 
-io.on('connection', (socket) => {
-  console.log(`✅ Socket connected: ${socket.id}`);
-
-  socket.on('disconnect', (reason) => {
-    console.log(`❌ Socket disconnected: ${socket.id} (${reason})`);
-  });
-});
+registerHandlers(io, gameManager);
 
 httpServer.listen(PORT, () => {
   console.log(`🎮 Server listening on port ${PORT}`);
