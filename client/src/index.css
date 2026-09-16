@@ -1,0 +1,31 @@
+@import url('https://fonts.googleapis.com/css2?family=Cinzel:wght@700;900&family=JetBrains+Mono:wght@400;500&family=Poppins:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --bg: #070b14;
+  --surface: #0c1526;
+  --card: #111d38;
+  --border: #1c2e50;
+  --gold: #f59e0b;
+  --gold-l: #fcd34d;
+  --red: #ef4444;
+  --blue: #60a5fa;
+  --green: #34d399;
+  --orange: #fb923c;
+  --purple: #a78bfa;
+  --text: #f1f5f9;
+  --muted: #94a3b8;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply min-h-screen bg-royal-dark font-poppins text-ink antialiased;
+  }
+}
