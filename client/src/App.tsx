@@ -1,7 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
-import { PageWrapper } from './components/layout/PageWrapper';
 import { useSocketEvents } from './hooks/useSocket';
+import { GamePage } from './pages/GamePage';
 import { HomePage } from './pages/HomePage';
 import { LobbyPage } from './pages/LobbyPage';
 
@@ -11,14 +11,6 @@ function SocketEvents() {
   return null;
 }
 
-function GamePlaceholder() {
-  return (
-    <PageWrapper className="flex min-h-screen items-center justify-center">
-      <div className="text-center font-cinzel text-3xl font-bold text-royal-gold-l">Game Coming in Phase 4</div>
-    </PageWrapper>
-  );
-}
-
 function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
@@ -26,7 +18,7 @@ function App() {
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/lobby" element={<LobbyPage />} />
-        <Route path="/game" element={<GamePlaceholder />} />
+        <Route path="/game" element={<GamePage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       <Toaster

@@ -74,6 +74,8 @@ export class Room {
   private readonly state: RoomState;
   /** Pending automatic phase transition (deal delay, next round, auto-actions). */
   private transitionTimer: NodeJS.Timeout | undefined;
+  /** Whether the Sipahi has stepped forward in the current SIPAHI_REVEAL phase. */
+  private sipahiRevealed = false;
 
   constructor(roomCode: string, hostPlayer: PlayerIdentity) {
     this.state = {
@@ -119,6 +121,10 @@ export class Room {
 
   get sipahiId(): string | undefined {
     return this.state.sipahiId;
+  }
+
+  get isSipahiRevealed(): boolean {
+    return this.sipahiRevealed;
   }
 
   get connectedCount(): number {
@@ -248,6 +254,7 @@ export class Room {
 
     this.state.rajaId = this.requirePlayerWithRole('raja').id;
     this.state.sipahiId = this.requirePlayerWithRole('sipahi').id;
+    this.sipahiRevealed = false;
     this.state.phase = 'CHIT_DEALING';
     return assignments;
   }
@@ -274,9 +281,21 @@ export class Room {
     if (requesterId !== this.state.sipahiId) {
       throw new GameError('NOT_YOUR_TURN', 'Only the Sipahi can reveal themselves.');
     }
+    if (this.sipahiRevealed) {
+      throw new GameError('INVALID_PHASE', 'The Sipahi has already stepped forward.');
+    }
     const sipahi = this.requirePlayerWithRole('sipahi');
-    this.state.phase = 'SIPAHI_GUESSING';
+    this.sipahiRevealed = true;
     return { sipahiPlayerId: sipahi.id, sipahiName: sipahi.name };
+  }
+
+  /** Moves from the Sipahi's reveal to the guessing phase. */
+  beginGuessing(): void {
+    this.assertPhase('SIPAHI_REVEAL');
+    if (!this.sipahiRevealed) {
+      throw new GameError('INVALID_PHASE', 'The Sipahi has not stepped forward yet.');
+    }
+    this.state.phase = 'SIPAHI_GUESSING';
   }
 
   /** Starts the server-side guess timer; `onExpire` fires if the Sipahi never guesses. */
@@ -407,6 +426,7 @@ export class Room {
       player.totalScore = 0;
       delete player.role;
     }
+    this.sipahiRevealed = false;
     this.state.phase = 'LOBBY';
     this.state.currentRound = 0;
     this.state.rajaId = undefined;
@@ -426,7 +446,10 @@ export class Room {
     if (this.state.rajaId && RAJA_PUBLIC_PHASES.includes(this.state.phase)) {
       state.rajaId = this.state.rajaId;
     }
-    if (this.state.sipahiId && SIPAHI_PUBLIC_PHASES.includes(this.state.phase)) {
+    const sipahiPublic =
+      SIPAHI_PUBLIC_PHASES.includes(this.state.phase) ||
+      (this.state.phase === 'SIPAHI_REVEAL' && this.sipahiRevealed);
+    if (this.state.sipahiId && sipahiPublic) {
       state.sipahiId = this.state.sipahiId;
     }
     return state;

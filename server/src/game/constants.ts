@@ -20,6 +20,8 @@ export const ROOM_CODE_PATTERN = /^[A-Z0-9]{6}$/;
 export const GUESS_TIMER_SECONDS = 15;
 /** Time players get to flip and read their chit before the Raja is revealed. */
 export const DEAL_REVEAL_DELAY_MS = 4000;
+/** Time everyone sees "[Name] is the Sipahi!" before the guess timer starts. */
+export const SIPAHI_REVEAL_DELAY_MS = 2000;
 /** Time the round result is shown before the next round is dealt. */
 export const ROUND_RESULT_DELAY_MS = 3000;
 /** Delay before the server acts on behalf of a disconnected Raja or Sipahi. */

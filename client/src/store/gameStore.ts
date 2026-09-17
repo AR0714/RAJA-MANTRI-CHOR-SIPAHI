@@ -18,6 +18,7 @@ interface GameState {
   myRole: Role | null;
   phase: GamePhase;
   currentRound: number;
+  maxRounds: number;
   totalScores: Record<string, number>;
   roundHistory: RoundResult[];
   isConnected: boolean;
@@ -30,6 +31,8 @@ interface GameState {
   hiddenPlayers: PublicPlayer[];
   /** Local timestamp (ms) when the server-side guess timer ends. */
   guessDeadline: number | null;
+  /** Length of the guess timer, for drawing the countdown ring. */
+  guessTimerSeconds: number;
   lastRoundResult: RoundResultPayload | null;
   /** The request the user is waiting on, used for button spinners. */
   pendingAction: PendingAction;
@@ -43,6 +46,7 @@ interface GameActions {
   setMyRole: (role: Role | null) => void;
   setPhase: (phase: GamePhase) => void;
   setCurrentRound: (round: number) => void;
+  setMaxRounds: (maxRounds: number) => void;
   setScores: (totalScores: Record<string, number>) => void;
   addRoundResult: (result: RoundResult) => void;
   setRoundHistory: (history: RoundResult[]) => void;
@@ -69,6 +73,7 @@ const initialRoomState: Omit<GameState, 'isConnected'> = {
   myRole: null,
   phase: 'LOBBY',
   currentRound: 0,
+  maxRounds: 10,
   totalScores: {},
   roundHistory: [],
   winner: null,
@@ -76,6 +81,7 @@ const initialRoomState: Omit<GameState, 'isConnected'> = {
   sipahiId: null,
   hiddenPlayers: [],
   guessDeadline: null,
+  guessTimerSeconds: 15,
   lastRoundResult: null,
   pendingAction: null,
 };
@@ -91,6 +97,7 @@ export const useGameStore = create<GameStore>()((set) => ({
   setMyRole: (myRole) => set({ myRole }),
   setPhase: (phase) => set({ phase }),
   setCurrentRound: (currentRound) => set({ currentRound }),
+  setMaxRounds: (maxRounds) => set({ maxRounds }),
   setScores: (totalScores) => set({ totalScores }),
   addRoundResult: (result) =>
     set((state) => ({
@@ -102,7 +109,11 @@ export const useGameStore = create<GameStore>()((set) => ({
   setRajaId: (rajaId) => set({ rajaId }),
   setSipahiId: (sipahiId) => set({ sipahiId }),
   setGuessing: (hiddenPlayers, timerSeconds) =>
-    set({ hiddenPlayers, guessDeadline: Date.now() + timerSeconds * 1000 }),
+    set({
+      hiddenPlayers,
+      guessTimerSeconds: timerSeconds,
+      guessDeadline: Date.now() + timerSeconds * 1000,
+    }),
   setLastRoundResult: (lastRoundResult) => set({ lastRoundResult }),
   resetRound: () =>
     set({

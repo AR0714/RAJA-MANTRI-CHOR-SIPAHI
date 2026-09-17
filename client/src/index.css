@@ -29,3 +29,56 @@
     @apply min-h-screen bg-royal-dark font-poppins text-ink antialiased;
   }
 }
+
+@layer components {
+  .shuffle-card {
+    animation: shuffle-card 0.75s ease-in-out infinite;
+  }
+
+  .confetti-particle {
+    position: absolute;
+    top: -24px;
+    opacity: 0;
+    animation-name: confetti-fall;
+    animation-timing-function: cubic-bezier(0.25, 0.6, 0.45, 1);
+    animation-fill-mode: forwards;
+    animation-iteration-count: 2;
+  }
+}
+
+@keyframes confetti-fall {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  85% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(var(--drift), 105vh, 0) rotate(var(--spin));
+  }
+}
+
+@keyframes shuffle-card {
+  0%,
+  100% {
+    transform: translateX(0) rotate(var(--tilt));
+  }
+  25% {
+    transform: translateX(var(--shift)) translateY(-10px) rotate(calc(var(--tilt) * -1));
+  }
+  50% {
+    transform: translateX(calc(var(--shift) * -0.6)) rotate(var(--tilt));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confetti-particle {
+    display: none;
+  }
+
+  .shuffle-card {
+    animation: none;
+  }
+}

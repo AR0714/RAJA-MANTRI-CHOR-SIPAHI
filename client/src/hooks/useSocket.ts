@@ -115,6 +115,7 @@ export function useSocketEvents(): void {
       s.setPendingAction(null);
       s.setPhase(gameState.phase);
       s.setCurrentRound(roundNumber);
+      s.setMaxRounds(gameState.maxRounds);
       s.setPlayers(gameState.players);
       s.setScores(scoresFromPlayers(gameState.players));
       navigate('/game');
@@ -124,6 +125,7 @@ export function useSocketEvents(): void {
       const s = store();
       s.setPhase(gameState.phase);
       s.setCurrentRound(gameState.currentRound);
+      s.setMaxRounds(gameState.maxRounds);
       s.setPlayers(gameState.players);
       s.setScores(scoresFromPlayers(gameState.players));
       if (gameState.rajaId) s.setRajaId(gameState.rajaId);
@@ -212,6 +214,8 @@ export interface UseSocketResult {
   sipahiReveal: () => void;
   sipahiGuess: (targetPlayerId: string) => void;
   playAgain: () => void;
+  /** Leaves the current room by reconnecting with a fresh socket. */
+  leaveRoom: () => void;
 }
 
 /** Connection status plus typed emitters for every client → server event. */
@@ -270,6 +274,12 @@ export function useSocket(): UseSocketResult {
       },
       playAgain: () => {
         if (ensureConnected()) socket.emit('play_again', {});
+      },
+      leaveRoom: () => {
+        // There is no leave event: the server drops a player whose socket disconnects.
+        useGameStore.getState().reset();
+        socket.disconnect();
+        socket.connect();
       },
     }),
     [isConnected, ensureConnected, withPending],
