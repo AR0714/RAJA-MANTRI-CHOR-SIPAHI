@@ -1,77 +1,49 @@
-import { useEffect, useState } from 'react';
-import { io } from 'socket.io-client';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
+import { PageWrapper } from './components/layout/PageWrapper';
+import { useSocketEvents } from './hooks/useSocket';
+import { HomePage } from './pages/HomePage';
+import { LobbyPage } from './pages/LobbyPage';
 
-const SERVER_URL = import.meta.env.VITE_SERVER_URL;
-
-type ConnectionStatus = 'connecting' | 'connected' | 'disconnected';
-type HealthStatus = 'checking' | 'ok' | 'unreachable';
-
-interface HealthResponse {
-  status: string;
+/** Registers socket listeners once; needs to live inside the router. */
+function SocketEvents() {
+  useSocketEvents();
+  return null;
 }
 
-function App() {
-  const [socketStatus, setSocketStatus] = useState<ConnectionStatus>('connecting');
-  const [socketId, setSocketId] = useState<string | null>(null);
-  const [health, setHealth] = useState<HealthStatus>('checking');
-
-  useEffect(() => {
-    const controller = new AbortController();
-    fetch(`${SERVER_URL}/health`, { signal: controller.signal })
-      .then((res) => res.json() as Promise<HealthResponse>)
-      .then((data) => setHealth(data.status === 'ok' ? 'ok' : 'unreachable'))
-      .catch((err: unknown) => {
-        if (!(err instanceof DOMException && err.name === 'AbortError')) setHealth('unreachable');
-      });
-
-    const socket = io(SERVER_URL);
-    socket.on('connect', () => {
-      setSocketStatus('connected');
-      setSocketId(socket.id ?? null);
-    });
-    socket.on('disconnect', () => {
-      setSocketStatus('disconnected');
-      setSocketId(null);
-    });
-    socket.on('connect_error', () => setSocketStatus('disconnected'));
-
-    return () => {
-      controller.abort();
-      socket.disconnect();
-    };
-  }, []);
-
+function GamePlaceholder() {
   return (
-    <main className="flex min-h-screen items-center justify-center px-4">
-      <div className="w-full max-w-md rounded-2xl border border-royal-border bg-royal-card p-8 text-center">
-        <h1 className="font-cinzel text-3xl font-black text-royal-gold">Raja Mantri Chor Sipahi</h1>
-        <p className="mt-2 text-sm text-ink-muted">Phase 1 · Foundation check</p>
-
-        <dl className="mt-8 space-y-3 text-left font-mono text-sm">
-          <StatusRow label="Health (/health)" value={health} good={health === 'ok'} />
-          <StatusRow label="Socket" value={socketStatus} good={socketStatus === 'connected'} />
-          <div className="flex justify-between gap-4">
-            <dt className="text-ink-muted">Socket ID</dt>
-            <dd className="truncate">{socketId ?? '—'}</dd>
-          </div>
-        </dl>
-      </div>
-    </main>
+    <PageWrapper className="flex min-h-screen items-center justify-center">
+      <div className="text-center font-cinzel text-3xl font-bold text-royal-gold-l">Game Coming in Phase 4</div>
+    </PageWrapper>
   );
 }
 
-interface StatusRowProps {
-  label: string;
-  value: string;
-  good: boolean;
-}
-
-function StatusRow({ label, value, good }: StatusRowProps) {
+function App() {
   return (
-    <div className="flex justify-between gap-4">
-      <dt className="text-ink-muted">{label}</dt>
-      <dd className={good ? 'text-role-sipahi' : 'text-role-chor'}>{value}</dd>
-    </div>
+    <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
+      <SocketEvents />
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/lobby" element={<LobbyPage />} />
+        <Route path="/game" element={<GamePlaceholder />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+      <Toaster
+        position="top-center"
+        toastOptions={{
+          style: {
+            background: '#111D38',
+            color: '#F1F5F9',
+            border: '1px solid #1C2E50',
+            fontFamily: 'Poppins, sans-serif',
+            fontSize: '14px',
+          },
+          success: { iconTheme: { primary: '#34D399', secondary: '#070B14' } },
+          error: { iconTheme: { primary: '#EF4444', secondary: '#070B14' } },
+        }}
+      />
+    </BrowserRouter>
   );
 }
 

@@ -357,6 +357,7 @@ export class Room {
     this.state.phase = 'ROUND_RESULT';
 
     return {
+      guessedPlayerId: targetPlayerId,
       correct: sipahiGuessedCorrectly,
       roles,
       roundScores,

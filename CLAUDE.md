@@ -165,7 +165,7 @@ mantriScore += 500;   // Always
 | raja_revealed      | { rajaPlayerId, rajaName }                         | All in room     |
 | sipahi_revealed    | { sipahiPlayerId, sipahiName }                     | All in room     |
 | sipahi_guessing    | { hiddenPlayers: Player[], timerSeconds: 15 }      | All in room     |
-| round_result       | { correct, roles, roundScores, totalScores, round }| All in room     |
+| round_result       | { guessedPlayerId, correct, roles, roundScores, totalScores, round } | All in room |
 | game_over          | { finalScores, winner, roundHistory }              | All in room     |
 | player_disconnected| { playerName, remainingCount }                     | All remaining   |
 | error              | { message: string, code: string }                  | Relevant player |

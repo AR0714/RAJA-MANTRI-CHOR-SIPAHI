@@ -1,3 +1,5 @@
+// Mirrors server/src/game/types.ts — keep the two files in sync.
+
 // ─── Core game types ──────────────────────────────────────────────────────────
 
 export type Role = 'raja' | 'mantri' | 'sipahi' | 'chor';
@@ -32,7 +34,6 @@ export interface Room {
   hostId: string;
   rajaId?: string;
   sipahiId?: string;
-  guessTimer?: NodeJS.Timeout;
   roundHistory: RoundResult[];
 }
 
