@@ -61,7 +61,7 @@ export function GuessPanel({
 
       <CountdownRing secondsLeft={secondsLeft} totalSeconds={timerSeconds} />
 
-      <div className="mt-8 grid w-full max-w-xl grid-cols-2 gap-4 sm:gap-6">
+      <div className="mt-6 grid w-full max-w-xl grid-cols-2 gap-3 sm:mt-8 sm:gap-6">
         {hiddenPlayers.map((player, i) => (
           <MysteryCard
             key={player.id}
@@ -116,7 +116,7 @@ function MysteryCard({ player, index, interactive, dimmed, isChosen, isOtherChos
       whileHover={interactive && !reduceMotion ? { y: -12, scale: 1.03 } : undefined}
       whileTap={interactive ? { scale: 0.97 } : undefined}
       transition={{ type: 'spring', stiffness: 260, damping: 22, delay: index * 0.1 }}
-      className={`group relative flex aspect-[3/4] flex-col items-center justify-center gap-3 rounded-3xl border-2 bg-gradient-to-br from-royal-card to-royal-dark p-4 shadow-2xl shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-gold-l disabled:cursor-default ${
+      className={`group relative flex aspect-[3/4] min-w-0 flex-col items-center justify-center gap-2 rounded-3xl border-2 bg-gradient-to-br from-royal-card to-royal-dark p-3 sm:gap-3 sm:p-4 shadow-2xl shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-gold-l disabled:cursor-default ${
         isChosen ? 'border-royal-gold' : 'border-royal-border'
       } ${interactive ? 'cursor-pointer' : ''} ${dimmed ? 'grayscale-[60%]' : ''}`}
     >
@@ -128,13 +128,13 @@ function MysteryCard({ player, index, interactive, dimmed, isChosen, isOtherChos
           transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut', delay: index * 0.4 }}
         />
       )}
-      <span className="font-cinzel text-5xl font-black text-royal-gold/60 sm:text-6xl" aria-hidden>
+      <span className="font-cinzel text-4xl font-black text-royal-gold/60 sm:text-6xl" aria-hidden>
         ?
       </span>
-      <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-royal-gold to-accent-purple font-cinzel text-2xl font-bold text-royal-dark sm:h-16 sm:w-16">
+      <span className="flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-royal-gold to-accent-purple font-cinzel text-xl sm:text-2xl font-bold text-royal-dark sm:h-16 sm:w-16">
         {player.name.charAt(0).toUpperCase()}
       </span>
-      <span className="max-w-full truncate font-poppins text-base font-semibold text-ink sm:text-lg">{player.name}</span>
+      <span className="max-w-full truncate font-poppins text-sm font-semibold text-ink sm:text-lg">{player.name}</span>
       {interactive && (
         <span className="font-mono text-[11px] uppercase tracking-widest text-role-chor opacity-70 transition-opacity group-hover:opacity-100">
           Accuse

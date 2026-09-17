@@ -23,6 +23,13 @@ export const DEAL_REVEAL_DELAY_MS = 4000;
 /** Time everyone sees "[Name] is the Sipahi!" before the guess timer starts. */
 export const SIPAHI_REVEAL_DELAY_MS = 2000;
 /** Time the round result is shown before the next round is dealt. */
-export const ROUND_RESULT_DELAY_MS = 3000;
-/** Delay before the server acts on behalf of a disconnected Raja or Sipahi. */
-export const AUTO_ACTION_DELAY_MS = 2000;
+export const ROUND_RESULT_DELAY_MS = 5000;
+/**
+ * Delay before the server acts for a disconnected Raja or Sipahi.
+ * Long enough for a page refresh to reconnect first.
+ */
+export const AUTO_ACTION_DELAY_MS = 5000;
+/** How long a player who drops out of the lobby keeps their seat. */
+export const LOBBY_REJOIN_GRACE_MS = 20_000;
+/** How long a room with nobody connected is kept so players can rejoin. */
+export const EMPTY_ROOM_TTL_MS = 60_000;

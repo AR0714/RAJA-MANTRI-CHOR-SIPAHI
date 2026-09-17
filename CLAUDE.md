@@ -152,12 +152,16 @@ mantriScore += 500;   // Always
 | sipahi_reveal      | {}                               | Sipahi reveals self         |
 | sipahi_guess       | { targetPlayerId: string }       | Sipahi clicks mystery card  |
 | play_again         | {}                               | Game over, play again       |
+| rejoin_room        | { roomCode, playerId, reconnectToken } | After refresh / reconnect |
+| leave_room         | {}                               | Player leaves (e.g. Home)   |
 
 ### Server → Client (socket.emit / io.to().emit)
 | Event              | Payload                                            | To              |
 |--------------------|----------------------------------------------------|-----------------|
-| room_created       | { roomCode, playerId, player }                     | Creator only    |
-| room_joined        | { roomCode, playerId, players }                    | Joiner only     |
+| room_created       | { roomCode, playerId, player, reconnectToken }     | Creator only    |
+| room_joined        | { roomCode, playerId, players, reconnectToken }    | Joiner only     |
+| room_rejoined      | { gameState, myRole, guessing, lastRoundResult, gameOver, roundHistory, … } | Rejoiner only |
+| session_replaced   | { message }                                        | Old socket of a rejoined player |
 | room_update        | { players, playerCount, hostId }                   | All in room     |
 | game_started       | { gameState, roundNumber }                         | All in room     |
 | phase_changed      | { gameState }  — sent on every phase transition   | All in room     |
@@ -187,7 +191,7 @@ export type GamePhase =
   | 'GAME_OVER';
 
 export interface Player {
-  id: string;           // socket.id
+  id: string;           // stable uuid (NOT socket.id) — survives reconnects
   name: string;
   isHost: boolean;
   isConnected: boolean;
@@ -315,6 +319,17 @@ VITE_SERVER_URL=http://localhost:5000
 - Phase 6: Deploy — Railway (server) + Vercel (client)
 
 ---
+
+## Reconnection
+
+- Player ids are stable uuids. The server maps each player to their current socket.
+- `room_created` / `room_joined` send a private `reconnectToken`. The client saves
+  { roomCode, playerId, reconnectToken } in sessionStorage + localStorage.
+- On reconnect or page refresh the client emits `rejoin_room`; the server replies with
+  `room_rejoined` (full catch-up snapshot) or `error` (ROOM_NOT_FOUND / REJOIN_FAILED).
+- Lobby seats are held for 20s after a disconnect; in-game seats are kept until the game ends.
+- Rooms with nobody connected are kept for 60s so players can rejoin.
+- The server acts for a disconnected Raja/Sipahi after 5s; a disconnected Sipahi's guess times out.
 
 ## Key Rules for Claude Code
 

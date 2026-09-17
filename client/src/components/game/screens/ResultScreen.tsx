@@ -6,7 +6,7 @@ import { RoundResult } from '../RoundResult';
 import { Scoreboard } from '../Scoreboard';
 
 /** Mirrors ROUND_RESULT_DELAY_MS on the server. */
-const NEXT_ROUND_SECONDS = 3;
+const NEXT_ROUND_SECONDS = 5;
 
 export function ResultScreen() {
   const result = useGameStore((s) => s.lastRoundResult);

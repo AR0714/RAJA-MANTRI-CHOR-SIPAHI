@@ -17,7 +17,7 @@ export function GameHeader() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-royal-border/60 bg-royal-dark/85 backdrop-blur">
-      <div className="mx-auto flex max-w-5xl items-center justify-between gap-2 px-4 py-3 sm:px-6">
+      <div className="mx-auto flex max-w-5xl flex-nowrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <span className="text-xl" aria-hidden>
             👑
@@ -30,15 +30,16 @@ export function GameHeader() {
           )}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
           {roleMeta && (
             <span
               title="Only you can see this"
-              className={`hidden items-center gap-1 rounded-full border px-2.5 py-1 font-poppins text-xs font-semibold min-[420px]:inline-flex ${roleMeta.borderClass} ${roleMeta.textClass} ${roleMeta.bgClass}`}
+              className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-poppins text-xs font-semibold ${roleMeta.borderClass} ${roleMeta.textClass} ${roleMeta.bgClass}`}
             >
               <span aria-hidden>{roleMeta.emoji}</span>
               <span className="sr-only">Your role: </span>
-              {roleMeta.label}
+              <span className="hidden min-[420px]:inline">{roleMeta.label}</span>
+              <span className="sr-only min-[420px]:hidden">{roleMeta.label}</span>
             </span>
           )}
           <button
@@ -46,13 +47,13 @@ export function GameHeader() {
             onClick={toggleMute}
             aria-label={isMuted ? 'Unmute sounds' : 'Mute sounds'}
             aria-pressed={isMuted}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-royal-border bg-royal-surface text-base transition-colors hover:border-royal-gold/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-gold-l"
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-royal-border bg-royal-surface text-base transition-colors hover:border-royal-gold/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-gold-l"
           >
             {isMuted ? '🔇' : '🔊'}
           </button>
           {roomCode && (
             <span
-              className="inline-flex items-center gap-1.5 rounded-full border border-royal-gold/40 bg-royal-gold/10 px-3 py-1 font-mono text-xs font-medium tracking-widest text-royal-gold-l"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-royal-gold/40 bg-royal-gold/10 px-3 py-1 font-mono text-xs font-medium tracking-widest text-royal-gold-l"
               aria-label={`Room code ${roomCode}`}
             >
               <span

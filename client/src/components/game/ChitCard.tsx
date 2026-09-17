@@ -16,7 +16,7 @@ const SECRET_HINT_MS = 3000;
 
 const SIZE_CLASSES = {
   md: 'h-64 w-44',
-  lg: 'h-80 w-56 sm:h-96 sm:w-64',
+  lg: 'h-72 w-52 sm:h-96 sm:w-64',
 } as const;
 
 const faceStyle = { backfaceVisibility: 'hidden', WebkitBackfaceVisibility: 'hidden' } as const;
@@ -53,14 +53,14 @@ export function ChitCard({ role, revealed, isPrivate = false, size = 'lg' }: Chi
               aria-hidden
               className="absolute inset-3 rounded-2xl border border-dashed border-royal-gold/25 bg-[repeating-linear-gradient(45deg,rgba(245,158,11,0.04)_0_10px,transparent_10px_20px)]"
             />
-            <span className="relative font-cinzel text-7xl font-black text-royal-gold/70">?</span>
+            <span className="relative font-cinzel text-6xl font-black text-royal-gold/70 sm:text-7xl">?</span>
             <span className="relative mt-2 font-mono text-xs uppercase tracking-[0.3em] text-ink-muted">Chit</span>
           </div>
 
           {/* Front: the role */}
           <div
             style={{ ...faceStyle, transform: 'rotateY(180deg)' }}
-            className={`absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-3xl border-2 bg-royal-card p-5 shadow-2xl ${
+            className={`absolute inset-0 flex flex-col items-center justify-center gap-2 rounded-3xl border-2 bg-royal-card p-4 shadow-2xl sm:gap-3 sm:p-5 ${
               meta ? `${meta.borderClass} ${meta.glowClass}` : 'border-royal-border'
             }`}
             aria-hidden={!isFaceUp}
@@ -68,10 +68,10 @@ export function ChitCard({ role, revealed, isPrivate = false, size = 'lg' }: Chi
             {meta && (
               <>
                 <div className={`absolute inset-0 rounded-3xl ${meta.bgClass}`} aria-hidden />
-                <span className="relative text-7xl sm:text-8xl" role="img" aria-label={meta.label}>
+                <span className="relative text-6xl sm:text-8xl" role="img" aria-label={meta.label}>
                   {meta.emoji}
                 </span>
-                <span className={`relative font-cinzel text-3xl font-black sm:text-4xl ${meta.textClass}`}>
+                <span className={`relative font-cinzel text-2xl font-black sm:text-4xl ${meta.textClass}`}>
                   {meta.label}
                 </span>
                 <span className="relative font-poppins text-xs uppercase tracking-[0.25em] text-ink-muted">

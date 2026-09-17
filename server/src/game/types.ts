@@ -12,7 +12,7 @@ export type GamePhase =
   | 'GAME_OVER';
 
 export interface Player {
-  id: string; // socket.id
+  id: string; // stable id (uuid) — survives reconnects, unlike socket.id
   name: string;
   isHost: boolean;
   isConnected: boolean;
@@ -78,6 +78,7 @@ export type ErrorCode =
   | 'INVALID_PHASE'
   | 'NOT_YOUR_TURN'
   | 'INVALID_TARGET'
+  | 'REJOIN_FAILED'
   | 'INTERNAL_ERROR';
 
 // ─── Client → Server payloads ─────────────────────────────────────────────────
@@ -107,18 +108,30 @@ export interface SipahiGuessPayload {
 
 export type PlayAgainPayload = EmptyPayload;
 
+export interface RejoinRoomPayload {
+  roomCode: string;
+  playerId: string;
+  reconnectToken: string;
+}
+
+export type LeaveRoomPayload = EmptyPayload;
+
 // ─── Server → Client payloads ─────────────────────────────────────────────────
 
 export interface RoomCreatedPayload {
   roomCode: string;
   playerId: string;
   player: PublicPlayer;
+  /** Secret for rejoining after a disconnect. Sent only to this player. */
+  reconnectToken: string;
 }
 
 export interface RoomJoinedPayload {
   roomCode: string;
   playerId: string;
   players: PublicPlayer[];
+  /** Secret for rejoining after a disconnect. Sent only to this player. */
+  reconnectToken: string;
 }
 
 export interface RoomUpdatePayload {
@@ -171,6 +184,27 @@ export interface GameOverPayload {
   roundHistory: RoundResult[];
 }
 
+export interface GuessingSnapshot extends SipahiGuessingPayload {
+  secondsLeft: number;
+}
+
+/** Everything a reconnecting player needs to catch up. Sent only to them. */
+export interface RoomRejoinedPayload {
+  roomCode: string;
+  playerId: string;
+  reconnectToken: string;
+  gameState: PublicGameState;
+  myRole: Role | null;
+  guessing: GuessingSnapshot | null;
+  lastRoundResult: RoundResultPayload | null;
+  gameOver: GameOverPayload | null;
+  roundHistory: RoundResult[];
+}
+
+export interface SessionReplacedPayload {
+  message: string;
+}
+
 export interface PlayerDisconnectedPayload {
   playerName: string;
   remainingCount: number;
@@ -192,11 +226,15 @@ export interface ClientToServerEvents {
   sipahi_reveal: (payload?: SipahiRevealPayload) => void;
   sipahi_guess: (payload: SipahiGuessPayload) => void;
   play_again: (payload?: PlayAgainPayload) => void;
+  rejoin_room: (payload: RejoinRoomPayload) => void;
+  leave_room: (payload?: LeaveRoomPayload) => void;
 }
 
 export interface ServerToClientEvents {
   room_created: (payload: RoomCreatedPayload) => void;
   room_joined: (payload: RoomJoinedPayload) => void;
+  room_rejoined: (payload: RoomRejoinedPayload) => void;
+  session_replaced: (payload: SessionReplacedPayload) => void;
   room_update: (payload: RoomUpdatePayload) => void;
   game_started: (payload: GameStartedPayload) => void;
   phase_changed: (payload: PhaseChangedPayload) => void;
@@ -212,4 +250,7 @@ export interface ServerToClientEvents {
 
 export type InterServerEvents = Record<string, never>;
 
-export type SocketData = Record<string, never>;
+export interface SocketData {
+  roomCode?: string;
+  playerId?: string;
+}

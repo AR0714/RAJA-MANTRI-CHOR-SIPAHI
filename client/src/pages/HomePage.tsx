@@ -3,7 +3,7 @@ import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
 import toast from 'react-hot-toast';
 import { Button } from '../components/ui/Button';
 import { PageWrapper } from '../components/layout/PageWrapper';
-import { useSocket } from '../hooks/useSocket';
+import { rejoinSavedSession, useSocket } from '../hooks/useSocket';
 import { useGameStore } from '../store/gameStore';
 import {
   NAME_MAX_LENGTH,
@@ -12,6 +12,7 @@ import {
   isValidRoomCode,
   normalizeRoomCode,
 } from '../utils/helpers';
+import { clearSession, loadStoredSession, type SavedSession } from '../utils/session';
 
 const NAME_STORAGE_KEY = 'rmcs:playerName';
 
@@ -37,6 +38,8 @@ export function HomePage() {
   const [createName, setCreateName] = useState(readSavedName);
   const [joinName, setJoinName] = useState(readSavedName);
   const [roomCode, setRoomCode] = useState('');
+  const [savedSession, setSavedSession] = useState<SavedSession | null>(loadStoredSession);
+  const isRejoining = useGameStore((s) => s.isRejoining);
 
   // Pre-fill the code from a shared link like /?code=ABC123.
   useEffect(() => {
@@ -89,6 +92,33 @@ export function HomePage() {
           The Classic UP/Bihar Card Game · 4 Players · Real-time Multiplayer
         </p>
       </header>
+
+      {savedSession && (
+        <motion.div
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mx-auto mt-8 flex w-full max-w-xl flex-col items-center gap-3 rounded-2xl border border-royal-gold/40 bg-royal-gold/10 p-4 text-center sm:flex-row sm:text-left"
+        >
+          <p className="flex-1 font-poppins text-sm text-ink">
+            You were playing in room <span className="font-mono font-medium text-royal-gold-l">{savedSession.roomCode}</span>.
+          </p>
+          <div className="flex gap-2">
+            <Button onClick={() => rejoinSavedSession(savedSession)} isLoading={isRejoining} className="px-4">
+              Rejoin
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                clearSession();
+                setSavedSession(null);
+              }}
+              className="px-3"
+            >
+              Dismiss
+            </Button>
+          </div>
+        </motion.div>
+      )}
 
       <div className="mt-12 grid gap-6 md:grid-cols-2">
         <LobbyCard

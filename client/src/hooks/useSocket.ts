@@ -6,9 +6,17 @@ import { useGameStore, type PendingAction } from '../store/gameStore';
 import type {
   ClientToServerEvents,
   PublicPlayer,
+  RoomRejoinedPayload,
   ServerToClientEvents,
 } from '../types/game.types';
 import { toRoundResult } from '../utils/helpers';
+import {
+  clearSession,
+  clearTabSession,
+  loadSession,
+  saveSession,
+  type SavedSession,
+} from '../utils/session';
 
 export type GameSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -21,8 +29,62 @@ export const socket: GameSocket = io(import.meta.env.VITE_SERVER_URL, {
   transports: ['websocket', 'polling'],
 });
 
+/** The socket id the server last attached to our seat. A different id means we must rejoin. */
+let attachedSocketId: string | null = null;
+/** Set while a rejoin_room request is waiting for a reply. */
+let rejoinInFlight = false;
+
 const scoresFromPlayers = (players: PublicPlayer[]): Record<string, number> =>
   Object.fromEntries(players.map((p) => [p.id, p.totalScore]));
+
+function requestRejoin(session: SavedSession): void {
+  rejoinInFlight = true;
+  useGameStore.getState().setRejoining(true);
+  toast.loading('Reconnecting…', { id: 'connection' });
+  socket.emit('rejoin_room', session);
+}
+
+/** Rejoin a seat saved by an earlier visit (used by the home page). */
+export function rejoinSavedSession(session: SavedSession): void {
+  if (!socket.connected) {
+    toast.error('Not connected to the game server yet.', { id: 'connection' });
+    return;
+  }
+  requestRejoin(session);
+}
+
+/** Replaces the store with the server's snapshot for this player. */
+function applyRejoinSnapshot(payload: RoomRejoinedPayload): void {
+  const s = useGameStore.getState();
+  const { gameState } = payload;
+
+  s.reset();
+  s.setRoomCode(payload.roomCode);
+  s.setPlayerId(payload.playerId);
+  s.setReconnectToken(payload.reconnectToken);
+  s.setMyPlayerName(gameState.players.find((p) => p.id === payload.playerId)?.name ?? '');
+  s.setPlayers(gameState.players);
+  s.setScores(scoresFromPlayers(gameState.players));
+  s.setPhase(gameState.phase);
+  s.setCurrentRound(gameState.currentRound);
+  s.setMaxRounds(gameState.maxRounds);
+  s.setMyRole(payload.myRole);
+  s.setRajaId(gameState.rajaId ?? null);
+  s.setSipahiId(gameState.sipahiId ?? null);
+  s.setRoundHistory(payload.roundHistory);
+
+  if (payload.guessing) {
+    s.setGuessing(payload.guessing.hiddenPlayers, payload.guessing.timerSeconds, payload.guessing.secondsLeft);
+  }
+  if (payload.lastRoundResult) {
+    s.setLastRoundResult(payload.lastRoundResult);
+    s.setScores(payload.lastRoundResult.totalScores);
+  }
+  if (payload.gameOver) {
+    s.setWinner(payload.gameOver.winner);
+    s.setScores(Object.fromEntries(payload.gameOver.finalScores.map((e) => [e.playerId, e.totalScore])));
+  }
+}
 
 /**
  * Registers every server → client listener and keeps the store in sync.
@@ -34,23 +96,35 @@ export function useSocketEvents(): void {
   useEffect(() => {
     const store = useGameStore.getState;
 
-    const onConnect = (): void => {
-      const { roomCode, playerId } = store();
-      store().setConnected(true);
+    const goToRoomPage = (phase: string) => {
+      const target = phase === 'LOBBY' ? '/lobby' : '/game';
+      if (window.location.pathname !== target) navigate(target, { replace: true });
+    };
 
-      // A new socket id means the server no longer knows us as a room member.
-      if (roomCode && playerId && playerId !== socket.id) {
-        store().reset();
-        toast.error('Connection was lost, so you left the room.', { id: 'connection' });
-        navigate('/');
-      } else if (roomCode) {
-        toast.success('Reconnected', { id: 'connection' });
+    const onConnect = (): void => {
+      const s = store();
+      s.setConnected(true);
+
+      if (s.roomCode && s.playerId && s.reconnectToken) {
+        // Reconnected after a drop: the server knows our seat by the old socket, so rejoin.
+        if (attachedSocketId !== socket.id && !rejoinInFlight) {
+          requestRejoin({ roomCode: s.roomCode, playerId: s.playerId, reconnectToken: s.reconnectToken });
+        }
+        return;
+      }
+
+      if (s.isRejoining && !rejoinInFlight) {
+        // Page was refreshed on /lobby or /game.
+        const saved = loadSession();
+        if (saved) requestRejoin(saved);
+        else s.setRejoining(false);
       }
     };
 
     const onDisconnect = (): void => {
       store().setConnected(false);
       store().setPendingAction(null);
+      rejoinInFlight = false;
       if (store().roomCode) {
         toast.loading('Connection lost. Reconnecting…', { id: 'connection' });
       }
@@ -64,40 +138,65 @@ export function useSocketEvents(): void {
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
-    if (socket.connected) store().setConnected(true);
+    if (socket.connected) onConnect();
 
-    socket.on('room_created', ({ roomCode, playerId, player }) => {
+    socket.on('room_created', ({ roomCode, playerId, player, reconnectToken }) => {
       const s = store();
       s.reset();
       s.setRoomCode(roomCode);
       s.setPlayerId(playerId);
+      s.setReconnectToken(reconnectToken);
       s.setMyPlayerName(player.name);
       s.setPlayers([player]);
       s.setScores(scoresFromPlayers([player]));
+      attachedSocketId = socket.id ?? null;
+      saveSession({ roomCode, playerId, reconnectToken });
       toast.success(`Room ${roomCode} created`);
       navigate('/lobby');
     });
 
-    socket.on('room_joined', ({ roomCode, playerId, players }) => {
+    socket.on('room_joined', ({ roomCode, playerId, players, reconnectToken }) => {
       const s = store();
       const me = players.find((p) => p.id === playerId);
       s.reset();
       s.setRoomCode(roomCode);
       s.setPlayerId(playerId);
+      s.setReconnectToken(reconnectToken);
       s.setMyPlayerName(me?.name ?? '');
       s.setPlayers(players);
       s.setScores(scoresFromPlayers(players));
+      attachedSocketId = socket.id ?? null;
+      saveSession({ roomCode, playerId, reconnectToken });
       toast.success(`Joined room ${roomCode}`);
       navigate('/lobby');
     });
 
+    socket.on('room_rejoined', (payload) => {
+      rejoinInFlight = false;
+      attachedSocketId = socket.id ?? null;
+      applyRejoinSnapshot(payload);
+      saveSession({ roomCode: payload.roomCode, playerId: payload.playerId, reconnectToken: payload.reconnectToken });
+      store().setRejoining(false);
+      toast.success('Reconnected', { id: 'connection' });
+      goToRoomPage(payload.gameState.phase);
+    });
+
+    socket.on('session_replaced', ({ message }) => {
+      attachedSocketId = null;
+      clearTabSession();
+      store().reset();
+      toast.error(message, { id: 'connection' });
+      navigate('/', { replace: true });
+    });
+
     socket.on('room_update', ({ players }) => {
       const s = store();
-      const knownIds = new Set(s.players.map((p) => p.id));
+      const previous = new Map(s.players.map((p) => [p.id, p]));
       for (const player of players) {
-        if (!knownIds.has(player.id) && player.id !== s.playerId) {
-          toast(`${player.name} joined`, { icon: '👋' });
-        }
+        if (player.id === s.playerId) continue;
+        const before = previous.get(player.id);
+        if (!before) toast(`${player.name} joined`, { icon: '👋' });
+        else if (!before.isConnected && player.isConnected) toast(`${player.name} reconnected`, { icon: '🔌' });
       }
       const me = players.find((p) => p.id === s.playerId);
       if (me) s.setMyPlayerName(me.name);
@@ -177,8 +276,22 @@ export function useSocketEvents(): void {
       toast(`${playerName} left · ${remainingCount} still here`, { icon: '🚪' });
     });
 
-    socket.on('error', ({ message }) => {
-      store().setPendingAction(null);
+    socket.on('error', ({ message, code }) => {
+      const s = store();
+      s.setPendingAction(null);
+
+      if (rejoinInFlight) {
+        rejoinInFlight = false;
+        attachedSocketId = null;
+        clearSession();
+        s.reset();
+        s.setRejoining(false);
+        toast.error(code === 'ROOM_NOT_FOUND' ? 'Your room expired' : 'Your seat was released — please join again', {
+          id: 'connection',
+        });
+        navigate('/', { replace: true });
+        return;
+      }
       toast.error(message);
     });
 
@@ -188,6 +301,8 @@ export function useSocketEvents(): void {
       socket.off('connect_error', onConnectError);
       socket.off('room_created');
       socket.off('room_joined');
+      socket.off('room_rejoined');
+      socket.off('session_replaced');
       socket.off('room_update');
       socket.off('game_started');
       socket.off('phase_changed');
@@ -214,8 +329,20 @@ export interface UseSocketResult {
   sipahiReveal: () => void;
   sipahiGuess: (targetPlayerId: string) => void;
   playAgain: () => void;
-  /** Leaves the current room by reconnecting with a fresh socket. */
+  /** Gives up this seat and forgets the saved session. */
   leaveRoom: () => void;
+}
+
+/** Leaves the room on the server (if connected) and clears local state. */
+export function leaveCurrentRoom(): void {
+  if (socket.connected && useGameStore.getState().roomCode) {
+    socket.emit('leave_room', {});
+  }
+  attachedSocketId = null;
+  rejoinInFlight = false;
+  clearSession();
+  useGameStore.getState().reset();
+  useGameStore.getState().setRejoining(false);
 }
 
 /** Connection status plus typed emitters for every client → server event. */
@@ -275,12 +402,7 @@ export function useSocket(): UseSocketResult {
       playAgain: () => {
         if (ensureConnected()) socket.emit('play_again', {});
       },
-      leaveRoom: () => {
-        // There is no leave event: the server drops a player whose socket disconnects.
-        useGameStore.getState().reset();
-        socket.disconnect();
-        socket.connect();
-      },
+      leaveRoom: leaveCurrentRoom,
     }),
     [isConnected, ensureConnected, withPending],
   );

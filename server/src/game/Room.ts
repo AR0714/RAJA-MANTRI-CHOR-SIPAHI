@@ -1,4 +1,4 @@
-import { randomInt } from 'crypto';
+import { randomBytes, randomInt, timingSafeEqual } from 'crypto';
 import {
   GUESS_TIMER_SECONDS,
   MAX_PLAYERS,
@@ -18,6 +18,7 @@ import type {
   Role,
   Room as RoomState,
   RoundResult,
+  RoomRejoinedPayload,
   RoundResultPayload,
   SipahiGuessingPayload,
   SipahiRevealedPayload,
@@ -26,6 +27,18 @@ import type {
 export interface PlayerIdentity {
   id: string;
   name: string;
+  socketId: string;
+}
+
+interface PlayerSession {
+  reconnectToken: string;
+  /** The socket currently speaking for this player, or null while disconnected. */
+  socketId: string | null;
+}
+
+export interface ReconnectResult {
+  /** A still-open socket that was replaced by this reconnect, if any. */
+  replacedSocketId: string | null;
 }
 
 export interface RoleAssignment {
@@ -59,6 +72,12 @@ function toPublicPlayer(player: Player): PublicPlayer {
   };
 }
 
+function tokensMatch(expected: string, actual: string): boolean {
+  const a = Buffer.from(expected);
+  const b = Buffer.from(actual);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
 function shuffle<T>(items: readonly T[]): T[] {
   const result = [...items];
   for (let i = result.length - 1; i > 0; i--) {
@@ -76,6 +95,14 @@ export class Room {
   private transitionTimer: NodeJS.Timeout | undefined;
   /** Whether the Sipahi has stepped forward in the current SIPAHI_REVEAL phase. */
   private sipahiRevealed = false;
+  private readonly sessions = new Map<string, PlayerSession>();
+  private readonly removalTimers = new Map<string, NodeJS.Timeout>();
+  private emptyRoomTimer: NodeJS.Timeout | undefined;
+  // Kept so reconnecting players can catch up on the current phase.
+  private guessDeadline: number | null = null;
+  private hiddenPlayerIds: string[] = [];
+  private lastRoundResult: RoundResultPayload | null = null;
+  private gameOverPayload: GameOverPayload | null = null;
 
   constructor(roomCode: string, hostPlayer: PlayerIdentity) {
     this.state = {
@@ -95,6 +122,7 @@ export class Room {
       hostId: hostPlayer.id,
       roundHistory: [],
     };
+    this.openSession(hostPlayer);
   }
 
   // ─── Read-only accessors ────────────────────────────────────────────────────
@@ -125,6 +153,10 @@ export class Room {
 
   get isSipahiRevealed(): boolean {
     return this.sipahiRevealed;
+  }
+
+  get playerCount(): number {
+    return this.state.players.length;
   }
 
   get connectedCount(): number {
@@ -175,6 +207,7 @@ export class Room {
       totalScore: 0,
     };
     this.state.players.push(player);
+    this.openSession(identity);
     return toPublicPlayer(player);
   }
 
@@ -184,22 +217,100 @@ export class Room {
     if (index === -1) return undefined;
 
     const [removed] = this.state.players.splice(index, 1);
+    this.sessions.delete(playerId);
+    this.cancelPlayerRemoval(playerId);
     if (removed && removed.id === this.state.hostId) {
       this.reassignHost();
     }
     return removed ? toPublicPlayer(removed) : undefined;
   }
 
-  /** Marks a player as disconnected mid-game, keeping their seat and score. */
+  /**
+   * Marks a player as disconnected, keeping their seat and score so they can rejoin.
+   * In the lobby the host keeps hosting until their seat is actually released.
+   */
   markDisconnected(playerId: string): PublicPlayer | undefined {
     const player = this.findPlayer(playerId);
     if (!player) return undefined;
 
     player.isConnected = false;
-    if (player.id === this.state.hostId) {
+    const session = this.sessions.get(playerId);
+    if (session) session.socketId = null;
+    if (player.id === this.state.hostId && this.state.phase !== 'LOBBY') {
       this.reassignHost();
     }
     return toPublicPlayer(player);
+  }
+
+  // ─── Sessions & reconnection ────────────────────────────────────────────────
+
+  getReconnectToken(playerId: string): string {
+    const session = this.sessions.get(playerId);
+    if (!session) throw new GameError('NOT_IN_ROOM', 'You are not in this room.');
+    return session.reconnectToken;
+  }
+
+  getSocketId(playerId: string): string | null {
+    return this.sessions.get(playerId)?.socketId ?? null;
+  }
+
+  /** True when `socketId` is the socket currently attached to `playerId`. */
+  isCurrentSocket(playerId: string, socketId: string): boolean {
+    return this.getSocketId(playerId) === socketId;
+  }
+
+  /** Re-attaches a returning player to a new socket after checking their token. */
+  reconnect(playerId: string, reconnectToken: string, socketId: string): ReconnectResult {
+    const player = this.findPlayer(playerId);
+    const session = this.sessions.get(playerId);
+    if (!player || !session || !tokensMatch(session.reconnectToken, reconnectToken)) {
+      throw new GameError('REJOIN_FAILED', 'Your seat in this room is no longer available.');
+    }
+
+    const replacedSocketId =
+      session.socketId !== null && session.socketId !== socketId ? session.socketId : null;
+    session.socketId = socketId;
+    player.isConnected = true;
+    this.cancelPlayerRemoval(playerId);
+    this.cancelEmptyRoomDeletion();
+    return { replacedSocketId };
+  }
+
+  /** Current state tailored to one player, for catching up after a reconnect. */
+  getRejoinSnapshot(playerId: string): RoomRejoinedPayload {
+    const player = this.requirePlayer(playerId);
+    const phase = this.state.phase;
+    const inRound = phase !== 'LOBBY' && phase !== 'GAME_OVER';
+
+    const hiddenPlayers = this.hiddenPlayerIds
+      .map((id) => this.getPublicPlayer(id))
+      .filter((p): p is PublicPlayer => p !== undefined);
+
+    return {
+      roomCode: this.state.code,
+      playerId,
+      reconnectToken: this.getReconnectToken(playerId),
+      gameState: this.getPublicState(),
+      myRole: inRound ? (player.role ?? null) : null,
+      guessing:
+        phase === 'SIPAHI_GUESSING' && this.guessDeadline !== null
+          ? {
+              hiddenPlayers,
+              timerSeconds: GUESS_TIMER_SECONDS,
+              secondsLeft: Math.max(0, (this.guessDeadline - Date.now()) / 1000),
+            }
+          : null,
+      lastRoundResult: phase === 'ROUND_RESULT' ? this.lastRoundResult : null,
+      gameOver: phase === 'GAME_OVER' ? this.gameOverPayload : null,
+      roundHistory: [...this.state.roundHistory],
+    };
+  }
+
+  private openSession(identity: PlayerIdentity): void {
+    this.sessions.set(identity.id, {
+      reconnectToken: randomBytes(24).toString('base64url'),
+      socketId: identity.socketId,
+    });
   }
 
   updateName(playerId: string, name: string): void {
@@ -255,6 +366,8 @@ export class Room {
     this.state.rajaId = this.requirePlayerWithRole('raja').id;
     this.state.sipahiId = this.requirePlayerWithRole('sipahi').id;
     this.sipahiRevealed = false;
+    this.hiddenPlayerIds = [];
+    this.lastRoundResult = null;
     this.state.phase = 'CHIT_DEALING';
     return assignments;
   }
@@ -306,11 +419,13 @@ export class Room {
       this.state.guessTimer = undefined;
       onExpire();
     }, GUESS_TIMER_SECONDS * 1000);
+    this.guessDeadline = Date.now() + GUESS_TIMER_SECONDS * 1000;
 
     const hiddenPlayers = shuffle([
       this.requirePlayerWithRole('mantri'),
       this.requirePlayerWithRole('chor'),
     ]).map(toPublicPlayer);
+    this.hiddenPlayerIds = hiddenPlayers.map((p) => p.id);
 
     return { hiddenPlayers, timerSeconds: GUESS_TIMER_SECONDS };
   }
@@ -375,7 +490,7 @@ export class Room {
     this.state.roundHistory.push(result);
     this.state.phase = 'ROUND_RESULT';
 
-    return {
+    this.lastRoundResult = {
       guessedPlayerId: targetPlayerId,
       correct: sipahiGuessedCorrectly,
       roles,
@@ -383,6 +498,7 @@ export class Room {
       totalScores,
       round: this.state.currentRound,
     };
+    return this.lastRoundResult;
   }
 
   /** Moves to the next round, or ends the game after the final round. */
@@ -398,10 +514,8 @@ export class Room {
       if (!winner) {
         throw new GameError('INTERNAL_ERROR', 'Cannot determine a winner without players.');
       }
-      return {
-        type: 'game_over',
-        payload: { finalScores, winner, roundHistory: [...this.state.roundHistory] },
-      };
+      this.gameOverPayload = { finalScores, winner, roundHistory: [...this.state.roundHistory] };
+      return { type: 'game_over', payload: this.gameOverPayload };
     }
 
     this.state.currentRound += 1;
@@ -421,7 +535,12 @@ export class Room {
     this.assertHost(requesterId);
 
     this.clearTimers();
+    for (const player of this.state.players) {
+      if (!player.isConnected) this.sessions.delete(player.id);
+    }
     this.state.players = this.state.players.filter((p) => p.isConnected);
+    this.gameOverPayload = null;
+    this.lastRoundResult = null;
     for (const player of this.state.players) {
       player.totalScore = 0;
       delete player.role;
@@ -466,9 +585,48 @@ export class Room {
     }, delayMs);
   }
 
+  /** Releases a disconnected player's seat after `delayMs` unless they rejoin. */
+  schedulePlayerRemoval(playerId: string, delayMs: number, callback: () => void): void {
+    this.cancelPlayerRemoval(playerId);
+    this.removalTimers.set(
+      playerId,
+      setTimeout(() => {
+        this.removalTimers.delete(playerId);
+        callback();
+      }, delayMs),
+    );
+  }
+
+  /** Deletes the room after `delayMs` unless someone rejoins first. */
+  scheduleEmptyRoomDeletion(delayMs: number, callback: () => void): void {
+    this.cancelEmptyRoomDeletion();
+    this.emptyRoomTimer = setTimeout(() => {
+      this.emptyRoomTimer = undefined;
+      callback();
+    }, delayMs);
+  }
+
   clearTimers(): void {
     this.clearGuessTimer();
     this.clearTransitionTimer();
+    this.cancelEmptyRoomDeletion();
+    for (const timer of this.removalTimers.values()) clearTimeout(timer);
+    this.removalTimers.clear();
+  }
+
+  private cancelPlayerRemoval(playerId: string): void {
+    const timer = this.removalTimers.get(playerId);
+    if (timer) {
+      clearTimeout(timer);
+      this.removalTimers.delete(playerId);
+    }
+  }
+
+  private cancelEmptyRoomDeletion(): void {
+    if (this.emptyRoomTimer) {
+      clearTimeout(this.emptyRoomTimer);
+      this.emptyRoomTimer = undefined;
+    }
   }
 
   private clearGuessTimer(): void {
@@ -476,6 +634,7 @@ export class Room {
       clearTimeout(this.state.guessTimer);
       this.state.guessTimer = undefined;
     }
+    this.guessDeadline = null;
   }
 
   private clearTransitionTimer(): void {

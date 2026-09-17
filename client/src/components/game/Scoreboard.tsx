@@ -49,12 +49,12 @@ export function Scoreboard({ compact = false, showDeltas = true, title = 'Scoreb
                 key={row.id}
                 layout
                 transition={{ type: 'spring', stiffness: 400, damping: 34 }}
-                className={`flex items-center gap-3 rounded-xl border px-3 ${compact ? 'py-2' : 'py-2.5'} ${
+                className={`flex min-w-0 items-center gap-2 rounded-xl border px-2.5 sm:gap-3 sm:px-3 ${compact ? 'py-2' : 'py-2.5'} ${
                   isMe ? 'border-royal-gold/50 bg-royal-gold/5' : 'border-royal-border/60 bg-royal-surface/60'
                 }`}
               >
-                <span className="w-5 text-center font-mono text-xs text-ink-muted">{i + 1}</span>
-                <span className="w-5 text-center" aria-label={isLeader ? 'Leader' : undefined}>
+                <span className="w-4 shrink-0 text-center font-mono text-xs text-ink-muted">{i + 1}</span>
+                <span className="w-5 shrink-0 text-center" aria-label={isLeader ? 'Leader' : undefined}>
                   {isLeader ? '👑' : ''}
                 </span>
                 <span className="min-w-0 flex-1 truncate font-poppins text-sm font-medium text-ink">
@@ -67,7 +67,7 @@ export function Scoreboard({ compact = false, showDeltas = true, title = 'Scoreb
                     key={`${currentRound}-${delta}`}
                     initial={{ opacity: 0, x: 8 }}
                     animate={{ opacity: 1, x: 0 }}
-                    className={`font-mono text-xs ${delta > 0 ? 'text-role-sipahi' : 'text-ink-muted'}`}
+                    className={`shrink-0 font-mono text-xs ${delta > 0 ? 'text-role-sipahi' : 'text-ink-muted'}`}
                   >
                     +{delta.toLocaleString('en-IN')}
                   </motion.span>
@@ -76,7 +76,7 @@ export function Scoreboard({ compact = false, showDeltas = true, title = 'Scoreb
                   value={row.score}
                   from={delta !== undefined ? row.score - delta : undefined}
                   delay={delta !== undefined ? 0.8 : 0}
-                  className={`w-16 text-right font-mono font-medium text-ink ${compact ? 'text-sm' : 'text-base'}`}
+                  className={`w-14 shrink-0 text-right font-mono font-medium text-ink sm:w-16 ${compact ? 'text-sm' : 'text-base'}`}
                 />
               </motion.li>
             );

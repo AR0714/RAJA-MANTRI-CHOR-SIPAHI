@@ -30,7 +30,7 @@ export function GameOverScreen() {
 
   const goHome = () => {
     leaveRoom();
-    navigate('/');
+    navigate('/', { replace: true });
   };
 
   return (

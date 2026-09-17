@@ -1,26 +1,31 @@
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
+import { ConnectionGate } from './components/layout/ConnectionGate';
+import { useDocumentTitle } from './hooks/useDocumentTitle';
 import { useSocketEvents } from './hooks/useSocket';
 import { GamePage } from './pages/GamePage';
 import { HomePage } from './pages/HomePage';
 import { LobbyPage } from './pages/LobbyPage';
 
-/** Registers socket listeners once; needs to live inside the router. */
-function SocketEvents() {
+/** Registers socket listeners and the tab title once; needs to live inside the router. */
+function AppEffects() {
   useSocketEvents();
+  useDocumentTitle();
   return null;
 }
 
 function App() {
   return (
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
-      <SocketEvents />
-      <Routes>
-        <Route path="/" element={<HomePage />} />
-        <Route path="/lobby" element={<LobbyPage />} />
-        <Route path="/game" element={<GamePage />} />
-        <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      <AppEffects />
+      <ConnectionGate>
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/lobby" element={<LobbyPage />} />
+          <Route path="/game" element={<GamePage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+      </ConnectionGate>
       <Toaster
         position="top-center"
         toastOptions={{
