@@ -34,8 +34,8 @@ interface GameState {
   sipahiId: string | null;
   /** The two players the Sipahi must choose between. */
   hiddenPlayers: PublicPlayer[];
-  /** Local timestamp (ms) when the server-side guess timer ends. */
-  guessDeadline: number | null;
+  /** Server-clock timestamp (ms) when the guess timer ends. Compare with serverNow(). */
+  guessEndsAt: number | null;
   /** Length of the guess timer, for drawing the countdown ring. */
   guessTimerSeconds: number;
   lastRoundResult: RoundResultPayload | null;
@@ -61,8 +61,7 @@ interface GameActions {
   setRejoining: (isRejoining: boolean) => void;
   setRajaId: (rajaId: string | null) => void;
   setSipahiId: (sipahiId: string | null) => void;
-  /** `secondsLeft` defaults to the full timer; rejoining players pass the time remaining. */
-  setGuessing: (hiddenPlayers: PublicPlayer[], timerSeconds: number, secondsLeft?: number) => void;
+  setGuessing: (hiddenPlayers: PublicPlayer[], timerSeconds: number, endsAt: number) => void;
   setLastRoundResult: (result: RoundResultPayload | null) => void;
   /** Clears per-round state before a new deal. */
   resetRound: () => void;
@@ -89,7 +88,7 @@ const initialRoomState: Omit<GameState, 'isConnected' | 'isRejoining'> = {
   rajaId: null,
   sipahiId: null,
   hiddenPlayers: [],
-  guessDeadline: null,
+  guessEndsAt: null,
   guessTimerSeconds: 15,
   lastRoundResult: null,
   pendingAction: null,
@@ -120,12 +119,8 @@ export const useGameStore = create<GameStore>()((set) => ({
   setRejoining: (isRejoining) => set({ isRejoining }),
   setRajaId: (rajaId) => set({ rajaId }),
   setSipahiId: (sipahiId) => set({ sipahiId }),
-  setGuessing: (hiddenPlayers, timerSeconds, secondsLeft = timerSeconds) =>
-    set({
-      hiddenPlayers,
-      guessTimerSeconds: timerSeconds,
-      guessDeadline: Date.now() + secondsLeft * 1000,
-    }),
+  setGuessing: (hiddenPlayers, timerSeconds, endsAt) =>
+    set({ hiddenPlayers, guessTimerSeconds: timerSeconds, guessEndsAt: endsAt }),
   setLastRoundResult: (lastRoundResult) => set({ lastRoundResult }),
   resetRound: () =>
     set({
@@ -133,7 +128,7 @@ export const useGameStore = create<GameStore>()((set) => ({
       rajaId: null,
       sipahiId: null,
       hiddenPlayers: [],
-      guessDeadline: null,
+      guessEndsAt: null,
       lastRoundResult: null,
     }),
   setPendingAction: (pendingAction) => set({ pendingAction }),

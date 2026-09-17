@@ -9,7 +9,7 @@ export function GuessingScreen() {
   const sipahiId = useGameStore((s) => s.sipahiId);
   const players = useGameStore((s) => s.players);
   const hiddenPlayers = useGameStore((s) => s.hiddenPlayers);
-  const guessDeadline = useGameStore((s) => s.guessDeadline);
+  const guessEndsAt = useGameStore((s) => s.guessEndsAt);
   const guessTimerSeconds = useGameStore((s) => s.guessTimerSeconds);
   const { sipahiGuess } = useSocket();
 
@@ -22,7 +22,7 @@ export function GuessingScreen() {
         isSipahi={sipahiId !== null && sipahiId === playerId}
         isSuspect={myRole === 'mantri' || myRole === 'chor'}
         sipahiName={sipahiName}
-        deadline={guessDeadline}
+        endsAt={guessEndsAt}
         timerSeconds={guessTimerSeconds}
         onGuess={sipahiGuess}
       />

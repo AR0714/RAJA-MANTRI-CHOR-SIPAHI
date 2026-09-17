@@ -154,6 +154,7 @@ mantriScore += 500;   // Always
 | play_again         | {}                               | Game over, play again       |
 | rejoin_room        | { roomCode, playerId, reconnectToken } | After refresh / reconnect |
 | leave_room         | {}                               | Player leaves (e.g. Home)   |
+| time_sync          | {} + ack → { serverNow }         | Clock sync for countdowns   |
 
 ### Server → Client (socket.emit / io.to().emit)
 | Event              | Payload                                            | To              |
@@ -168,8 +169,8 @@ mantriScore += 500;   // Always
 | role_assigned      | { role, points }                                   | Each privately  |
 | raja_revealed      | { rajaPlayerId, rajaName }                         | All in room     |
 | sipahi_revealed    | { sipahiPlayerId, sipahiName }                     | All in room     |
-| sipahi_guessing    | { hiddenPlayers: Player[], timerSeconds: 15 }      | All in room     |
-| round_result       | { guessedPlayerId, correct, roles, roundScores, totalScores, round } | All in room |
+| sipahi_guessing    | { hiddenPlayers, timerSeconds: 15, endsAt }        | All in room     |
+| round_result       | { guessedPlayerId, correct, roles, roundScores, totalScores, round, nextPhaseAt } | All in room |
 | game_over          | { finalScores, winner, roundHistory }              | All in room     |
 | player_disconnected| { playerName, remainingCount }                     | All remaining   |
 | error              | { message: string, code: string }                  | Relevant player |
@@ -330,6 +331,14 @@ VITE_SERVER_URL=http://localhost:5000
 - Lobby seats are held for 20s after a disconnect; in-game seats are kept until the game ends.
 - Rooms with nobody connected are kept for 60s so players can rejoin.
 - The server acts for a disconnected Raja/Sipahi after 5s; a disconnected Sipahi's guess times out.
+
+## Timing & fairness
+
+- `endsAt` / `nextPhaseAt` are server-clock epoch ms. Clients estimate the server clock with
+  `time_sync` (utils/serverClock.ts) so all four screens show the same countdown.
+- Ties after round 10 are won by the player who joined the room first.
+- Socket.io: websocket + polling, pingTimeout 60s, pingInterval 25s, connectTimeout 45s.
+- CLIENT_URL may be a comma-separated list of exact origins; wildcards are rejected.
 
 ## Key Rules for Claude Code
 

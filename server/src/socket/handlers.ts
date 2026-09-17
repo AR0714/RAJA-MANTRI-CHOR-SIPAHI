@@ -20,6 +20,7 @@ import type {
   PublicPlayer,
   ServerToClientEvents,
   SocketData,
+  TimeSyncResponse,
 } from '../game/types';
 
 export type GameServer = Server<ClientToServerEvents, ServerToClientEvents, InterServerEvents, SocketData>;
@@ -278,6 +279,11 @@ export function registerHandlers(io: GameServer, manager: GameManager): void {
       socket.data.playerId = playerId;
       void socket.join(room.code);
     };
+
+    // Lets clients estimate the server clock so every screen counts down to the same instant.
+    socket.on('time_sync', (_payload: unknown, ack?: (response: TimeSyncResponse) => void) => {
+      if (typeof ack === 'function') ack({ serverNow: Date.now() });
+    });
 
     socket.on('create_room', (payload: unknown) =>
       handle('create_room', () => {

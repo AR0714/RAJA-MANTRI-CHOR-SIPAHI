@@ -8,31 +8,14 @@ import { Badge } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { useSocket } from '../hooks/useSocket';
 import { useGameStore } from '../store/gameStore';
+import { copyText } from '../utils/clipboard';
 import {
   MAX_PLAYERS,
   NAME_MAX_LENGTH,
+  buildInviteMessage,
   buildWhatsAppShareUrl,
   isValidPlayerName,
 } from '../utils/helpers';
-
-async function copyText(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    // Fallback for browsers or contexts without the async clipboard API.
-    const textarea = document.createElement('textarea');
-    textarea.value = text;
-    textarea.setAttribute('readonly', '');
-    textarea.style.position = 'fixed';
-    textarea.style.opacity = '0';
-    document.body.appendChild(textarea);
-    textarea.select();
-    const ok = document.execCommand('copy');
-    textarea.remove();
-    return ok;
-  }
-}
 
 export function LobbyPage() {
   const roomCode = useGameStore((s) => s.roomCode);
@@ -56,9 +39,9 @@ export function LobbyPage() {
   const seats = Array.from({ length: MAX_PLAYERS }, (_, i) => players[i] ?? null);
 
   const handleCopy = async () => {
-    if (await copyText(roomCode)) {
+    if (await copyText(buildInviteMessage(roomCode))) {
       setCopied(true);
-      toast.success('Room code copied');
+      toast.success('Invite link copied');
       window.setTimeout(() => setCopied(false), 2000);
     } else {
       toast.error('Could not copy. Select the code and copy it manually.');
@@ -97,7 +80,7 @@ export function LobbyPage() {
 
         <div className="mt-6 flex flex-wrap justify-center gap-3">
           <Button variant="outline" onClick={() => void handleCopy()}>
-            {copied ? '✅ Copied' : '📋 Copy code'}
+            {copied ? '✅ Link copied' : '🔗 Copy invite link'}
           </Button>
           <a
             href={buildWhatsAppShareUrl(roomCode)}

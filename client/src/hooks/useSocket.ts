@@ -10,6 +10,7 @@ import type {
   ServerToClientEvents,
 } from '../types/game.types';
 import { toRoundResult } from '../utils/helpers';
+import { syncServerClock } from '../utils/serverClock';
 import {
   clearSession,
   clearTabSession,
@@ -26,7 +27,14 @@ const PENDING_TIMEOUT_MS = 10_000;
 /** One shared connection for the whole app. */
 export const socket: GameSocket = io(import.meta.env.VITE_SERVER_URL, {
   autoConnect: true,
+  // WebSocket first; long-polling fallback for networks that block WebSockets.
   transports: ['websocket', 'polling'],
+  // Keep retrying on flaky mobile data, backing off to at most 5s between attempts.
+  reconnection: true,
+  reconnectionAttempts: Infinity,
+  reconnectionDelay: 1000,
+  reconnectionDelayMax: 5000,
+  timeout: 20_000,
 });
 
 /** The socket id the server last attached to our seat. A different id means we must rejoin. */
@@ -74,7 +82,7 @@ function applyRejoinSnapshot(payload: RoomRejoinedPayload): void {
   s.setRoundHistory(payload.roundHistory);
 
   if (payload.guessing) {
-    s.setGuessing(payload.guessing.hiddenPlayers, payload.guessing.timerSeconds, payload.guessing.secondsLeft);
+    s.setGuessing(payload.guessing.hiddenPlayers, payload.guessing.timerSeconds, payload.guessing.endsAt);
   }
   if (payload.lastRoundResult) {
     s.setLastRoundResult(payload.lastRoundResult);
@@ -104,6 +112,7 @@ export function useSocketEvents(): void {
     const onConnect = (): void => {
       const s = store();
       s.setConnected(true);
+      void syncServerClock(socket);
 
       if (s.roomCode && s.playerId && s.reconnectToken) {
         // Reconnected after a drop: the server knows our seat by the old socket, so rejoin.
@@ -135,9 +144,20 @@ export function useSocketEvents(): void {
       store().setPendingAction(null);
     };
 
+    // Phones pause or kill the connection when the screen locks. Reconnect as soon as the
+    // page is visible or the network is back instead of waiting for the retry backoff.
+    const onResume = (): void => {
+      if (document.visibilityState !== 'visible') return;
+      if (!socket.connected) socket.connect();
+      else void syncServerClock(socket);
+    };
+
     socket.on('connect', onConnect);
     socket.on('disconnect', onDisconnect);
     socket.on('connect_error', onConnectError);
+    document.addEventListener('visibilitychange', onResume);
+    window.addEventListener('online', onResume);
+    window.addEventListener('focus', onResume);
     if (socket.connected) onConnect();
 
     socket.on('room_created', ({ roomCode, playerId, player, reconnectToken }) => {
@@ -250,8 +270,8 @@ export function useSocketEvents(): void {
       store().setSipahiId(sipahiPlayerId);
     });
 
-    socket.on('sipahi_guessing', ({ hiddenPlayers, timerSeconds }) => {
-      store().setGuessing(hiddenPlayers, timerSeconds);
+    socket.on('sipahi_guessing', ({ hiddenPlayers, timerSeconds, endsAt }) => {
+      store().setGuessing(hiddenPlayers, timerSeconds, endsAt);
     });
 
     socket.on('round_result', (payload) => {
@@ -296,6 +316,9 @@ export function useSocketEvents(): void {
     });
 
     return () => {
+      document.removeEventListener('visibilitychange', onResume);
+      window.removeEventListener('online', onResume);
+      window.removeEventListener('focus', onResume);
       socket.off('connect', onConnect);
       socket.off('disconnect', onDisconnect);
       socket.off('connect_error', onConnectError);

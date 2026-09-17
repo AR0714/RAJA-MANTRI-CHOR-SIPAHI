@@ -1,43 +1,65 @@
 import { motion, useReducedMotion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import type { PublicPlayer } from '../../types/game.types';
+import { serverNow } from '../../utils/serverClock';
 
 interface GuessPanelProps {
   hiddenPlayers: PublicPlayer[];
   isSipahi: boolean;
   sipahiName: string;
-  /** Local timestamp (ms) when the server-side timer runs out. */
-  deadline: number | null;
+  /** Server-clock timestamp (ms) when the timer runs out. */
+  endsAt: number | null;
   timerSeconds: number;
   /** True when the viewer is one of the two suspects. */
   isSuspect: boolean;
   onGuess: (targetPlayerId: string) => void;
 }
 
-function useSecondsLeft(deadline: number | null): number {
-  const [now, setNow] = useState(() => Date.now());
+/**
+ * Seconds until `endsAt` on the server clock, so every player sees the same countdown.
+ * A 100ms tick keeps the ring smooth, and an extra update lands exactly on each whole-second
+ * boundary so the number changes at the same instant on every screen.
+ */
+function useSecondsLeft(endsAt: number | null): number {
+  const [now, setNow] = useState(serverNow);
 
   useEffect(() => {
-    if (deadline === null) return;
-    const interval = window.setInterval(() => setNow(Date.now()), 100);
-    return () => window.clearInterval(interval);
-  }, [deadline]);
+    if (endsAt === null) return;
+    const interval = window.setInterval(() => setNow(serverNow()), 100);
 
-  return deadline === null ? 0 : Math.max(0, (deadline - now) / 1000);
+    let boundaryTimer: number | undefined;
+    const scheduleBoundary = () => {
+      const remaining = endsAt - serverNow();
+      if (remaining <= 0) return;
+      const untilNextSecond = remaining % 1000 || 1000;
+      boundaryTimer = window.setTimeout(() => {
+        setNow(serverNow());
+        scheduleBoundary();
+      }, untilNextSecond + 2);
+    };
+    scheduleBoundary();
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(boundaryTimer);
+    };
+  }, [endsAt]);
+
+  return endsAt === null ? 0 : Math.max(0, (endsAt - now) / 1000);
 }
 
 export function GuessPanel({
   hiddenPlayers,
   isSipahi,
   sipahiName,
-  deadline,
+  endsAt,
   timerSeconds,
   isSuspect,
   onGuess,
 }: GuessPanelProps) {
   const [chosenId, setChosenId] = useState<string | null>(null);
-  const secondsLeft = useSecondsLeft(deadline);
-  const timeUp = secondsLeft <= 0 && deadline !== null;
+  const secondsLeft = useSecondsLeft(endsAt);
+  const timeUp = secondsLeft <= 0 && endsAt !== null;
   const canChoose = isSipahi && chosenId === null && !timeUp;
 
   const handleChoose = (playerId: string) => {
@@ -77,7 +99,9 @@ export function GuessPanel({
       </div>
 
       <p className="mt-6 min-h-6 font-poppins text-sm text-ink-muted" aria-live="polite">
-        {isSipahi && chosenName && `You accused ${chosenName}. Revealing…`}
+        {isSipahi && chosenName && (
+          <span className="font-semibold text-royal-gold-l">Accusing {chosenName}...</span>
+        )}
         {isSipahi && !chosenName && timeUp && 'Time is up!'}
         {!isSipahi && (
           <span className="inline-flex items-center gap-2">
@@ -112,12 +136,12 @@ function MysteryCard({ player, index, interactive, dimmed, isChosen, isOtherChos
       disabled={!interactive}
       aria-label={`Accuse ${player.name}`}
       initial={{ opacity: 0, y: 30, rotate: index === 0 ? -4 : 4 }}
-      animate={{ opacity: isOtherChosen ? 0.35 : 1, y: 0, rotate: 0, scale: isChosen ? 1.04 : 1 }}
+      animate={{ opacity: isOtherChosen ? 0.35 : 1, y: 0, rotate: 0, scale: isChosen ? 1.06 : 1 }}
       whileHover={interactive && !reduceMotion ? { y: -12, scale: 1.03 } : undefined}
       whileTap={interactive ? { scale: 0.97 } : undefined}
       transition={{ type: 'spring', stiffness: 260, damping: 22, delay: index * 0.1 }}
       className={`group relative flex aspect-[3/4] min-w-0 flex-col items-center justify-center gap-2 rounded-3xl border-2 bg-gradient-to-br from-royal-card to-royal-dark p-3 sm:gap-3 sm:p-4 shadow-2xl shadow-black/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-royal-gold-l disabled:cursor-default ${
-        isChosen ? 'border-royal-gold' : 'border-royal-border'
+        isChosen ? 'border-royal-gold shadow-royal-gold/40 ring-2 ring-royal-gold/60' : 'border-royal-border'
       } ${interactive ? 'cursor-pointer' : ''} ${dimmed ? 'grayscale-[60%]' : ''}`}
     >
       {waiting && !reduceMotion && (

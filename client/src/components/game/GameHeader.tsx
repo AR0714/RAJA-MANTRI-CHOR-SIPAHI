@@ -16,7 +16,7 @@ export function GameHeader() {
   const roleMeta = myRole && phase !== 'CHIT_DEALING' && phase !== 'GAME_OVER' ? ROLE_META[myRole] : null;
 
   return (
-    <header className="sticky top-0 z-30 border-b border-royal-border/60 bg-royal-dark/85 backdrop-blur">
+    <header className="border-b border-royal-border/60 bg-royal-dark/85 backdrop-blur">
       <div className="mx-auto flex max-w-5xl flex-nowrap items-center justify-between gap-2 px-4 py-2 sm:px-6">
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <span className="text-xl" aria-hidden>

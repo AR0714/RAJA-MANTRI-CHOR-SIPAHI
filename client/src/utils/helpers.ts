@@ -21,9 +21,39 @@ export function isValidPlayerName(name: string): boolean {
   return trimmed.length >= 1 && trimmed.length <= NAME_MAX_LENGTH;
 }
 
+/**
+ * Link that opens the home page with the room code pre-filled, e.g.
+ * https://your-app.vercel.app/?code=ABC123. Uses the current site's origin, so it
+ * points at the deployed URL in production.
+ */
+export function buildInviteUrl(roomCode: string, origin: string = window.location.origin): string {
+  return `${origin}/?code=${encodeURIComponent(roomCode)}`;
+}
+
+export function buildInviteMessage(roomCode: string): string {
+  return `Join my Raja Mantri game! 👑 Code: ${roomCode}\n${buildInviteUrl(roomCode)}`;
+}
+
 export function buildWhatsAppShareUrl(roomCode: string): string {
-  const text = `Join my Raja Mantri game! Code: ${roomCode}`;
-  return `https://wa.me/?text=${encodeURIComponent(text)}`;
+  return `https://wa.me/?text=${encodeURIComponent(buildInviteMessage(roomCode))}`;
+}
+
+/** 1 → "1st", 2 → "2nd", 3 → "3rd", 4 → "4th". */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  if (tens >= 11 && tens <= 13) return `${n}th`;
+  return `${n}${({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th'}`;
+}
+
+/**
+ * Players ranked by total score; ties go to whoever joined the room first
+ * (the same rule the server uses to pick the winner).
+ */
+export function rankPlayers<T extends { id: string }>(players: T[], scoreOf: (p: T) => number): T[] {
+  return players
+    .map((player, joinOrder) => ({ player, joinOrder, score: scoreOf(player) }))
+    .sort((a, b) => b.score - a.score || a.joinOrder - b.joinOrder)
+    .map(({ player }) => player);
 }
 
 /** Formats seconds as m:ss. */

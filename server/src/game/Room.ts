@@ -5,6 +5,7 @@ import {
   MAX_ROUNDS,
   ROLES,
   ROLE_POINTS,
+  ROUND_RESULT_DELAY_MS,
 } from './constants';
 import { GameError } from './errors';
 import type {
@@ -294,11 +295,7 @@ export class Room {
       myRole: inRound ? (player.role ?? null) : null,
       guessing:
         phase === 'SIPAHI_GUESSING' && this.guessDeadline !== null
-          ? {
-              hiddenPlayers,
-              timerSeconds: GUESS_TIMER_SECONDS,
-              secondsLeft: Math.max(0, (this.guessDeadline - Date.now()) / 1000),
-            }
+          ? { hiddenPlayers, timerSeconds: GUESS_TIMER_SECONDS, endsAt: this.guessDeadline }
           : null,
       lastRoundResult: phase === 'ROUND_RESULT' ? this.lastRoundResult : null,
       gameOver: phase === 'GAME_OVER' ? this.gameOverPayload : null,
@@ -427,7 +424,7 @@ export class Room {
     ]).map(toPublicPlayer);
     this.hiddenPlayerIds = hiddenPlayers.map((p) => p.id);
 
-    return { hiddenPlayers, timerSeconds: GUESS_TIMER_SECONDS };
+    return { hiddenPlayers, timerSeconds: GUESS_TIMER_SECONDS, endsAt: this.guessDeadline };
   }
 
   /**
@@ -497,6 +494,7 @@ export class Room {
       roundScores,
       totalScores,
       round: this.state.currentRound,
+      nextPhaseAt: Date.now() + ROUND_RESULT_DELAY_MS,
     };
     return this.lastRoundResult;
   }
@@ -522,11 +520,15 @@ export class Room {
     return { type: 'next_round', assignments: this.dealChits() };
   }
 
-  /** Scores sorted highest first; ties keep join order. */
+  /**
+   * Scores sorted highest first. Ties are broken by join order: the player who
+   * joined the room earlier ranks higher (and wins a tied game).
+   */
   getFinalScores(): FinalScoreEntry[] {
     return this.state.players
-      .map((p) => ({ playerId: p.id, name: p.name, totalScore: p.totalScore }))
-      .sort((a, b) => b.totalScore - a.totalScore);
+      .map((p, joinOrder) => ({ entry: { playerId: p.id, name: p.name, totalScore: p.totalScore }, joinOrder }))
+      .sort((a, b) => b.entry.totalScore - a.entry.totalScore || a.joinOrder - b.joinOrder)
+      .map(({ entry }) => entry);
   }
 
   /** Returns a finished game to the lobby, dropping players who have left. */

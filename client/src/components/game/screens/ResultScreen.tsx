@@ -2,11 +2,8 @@ import { useEffect } from 'react';
 import { useAudio } from '../../../hooks/useAudio';
 import { useGameStore } from '../../../store/gameStore';
 import { Spinner } from '../../ui/Spinner';
-import { RoundResult } from '../RoundResult';
+import { RESULT_COUNT_UP_DELAY_S, RoundResult } from '../RoundResult';
 import { Scoreboard } from '../Scoreboard';
-
-/** Mirrors ROUND_RESULT_DELAY_MS on the server. */
-const NEXT_ROUND_SECONDS = 5;
 
 export function ResultScreen() {
   const result = useGameStore((s) => s.lastRoundResult);
@@ -34,15 +31,9 @@ export function ResultScreen() {
 
   return (
     <div className="space-y-8">
-      <RoundResult
-        result={result}
-        players={players}
-        myPlayerId={playerId}
-        isFinalRound={result.round >= maxRounds}
-        nextRoundInSeconds={NEXT_ROUND_SECONDS}
-      />
+      <RoundResult result={result} players={players} myPlayerId={playerId} isFinalRound={result.round >= maxRounds} />
       <div className="mx-auto max-w-xl">
-        <Scoreboard />
+        <Scoreboard countUpDelay={RESULT_COUNT_UP_DELAY_S} />
       </div>
     </div>
   );

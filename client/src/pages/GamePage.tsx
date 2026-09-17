@@ -1,6 +1,7 @@
 import { AnimatePresence, motion } from 'framer-motion';
 import { Navigate } from 'react-router-dom';
 import { GameHeader } from '../components/game/GameHeader';
+import { PlayerStrip } from '../components/game/PlayerStrip';
 import { DealingScreen } from '../components/game/screens/DealingScreen';
 import { GameOverScreen } from '../components/game/screens/GameOverScreen';
 import { GuessingScreen } from '../components/game/screens/GuessingScreen';
@@ -43,8 +44,11 @@ export function GamePage() {
         aria-hidden
         className="pointer-events-none absolute inset-x-0 top-0 h-[520px] bg-[radial-gradient(ellipse_at_top,rgba(245,158,11,0.10),transparent_65%)]"
       />
-      <GameHeader />
-      <main className="relative mx-auto flex min-h-[calc(100vh-61px)] w-full max-w-5xl flex-col justify-center px-4 py-10 sm:px-6">
+      <div className="sticky top-0 z-30">
+        <GameHeader />
+        {phase !== 'GAME_OVER' && <PlayerStrip />}
+      </div>
+      <main className="relative mx-auto flex min-h-[calc(100vh-110px)] w-full max-w-5xl flex-col justify-center px-4 py-10 sm:px-6">
         <AnimatePresence mode="wait">
           <motion.div
             // Remount per phase and round so each screen starts its animations fresh.

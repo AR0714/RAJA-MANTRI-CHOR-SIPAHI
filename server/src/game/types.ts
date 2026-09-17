@@ -167,6 +167,8 @@ export interface SipahiRevealedPayload {
 export interface SipahiGuessingPayload {
   hiddenPlayers: PublicPlayer[];
   timerSeconds: number;
+  /** Server clock (epoch ms) when the guess timer runs out. Clients count down to this. */
+  endsAt: number;
 }
 
 export interface RoundResultPayload {
@@ -176,6 +178,8 @@ export interface RoundResultPayload {
   roundScores: Record<string, number>;
   totalScores: Record<string, number>;
   round: number;
+  /** Server clock (epoch ms) when the next round (or game over) begins. */
+  nextPhaseAt: number;
 }
 
 export interface GameOverPayload {
@@ -184,9 +188,7 @@ export interface GameOverPayload {
   roundHistory: RoundResult[];
 }
 
-export interface GuessingSnapshot extends SipahiGuessingPayload {
-  secondsLeft: number;
-}
+export type GuessingSnapshot = SipahiGuessingPayload;
 
 /** Everything a reconnecting player needs to catch up. Sent only to them. */
 export interface RoomRejoinedPayload {
@@ -199,6 +201,11 @@ export interface RoomRejoinedPayload {
   lastRoundResult: RoundResultPayload | null;
   gameOver: GameOverPayload | null;
   roundHistory: RoundResult[];
+}
+
+export interface TimeSyncResponse {
+  /** Server clock (epoch ms) when the request was handled. */
+  serverNow: number;
 }
 
 export interface SessionReplacedPayload {
@@ -228,6 +235,7 @@ export interface ClientToServerEvents {
   play_again: (payload?: PlayAgainPayload) => void;
   rejoin_room: (payload: RejoinRoomPayload) => void;
   leave_room: (payload?: LeaveRoomPayload) => void;
+  time_sync: (payload: EmptyPayload, ack: (response: TimeSyncResponse) => void) => void;
 }
 
 export interface ServerToClientEvents {
