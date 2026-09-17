@@ -47,7 +47,7 @@ After **10 rounds**, the player with the most points wins.
 
 **Client** — React 18, TypeScript, Vite 5, Tailwind CSS 3.4, Framer Motion 11, Zustand 5, React Router 6, socket.io-client 4.7, react-hot-toast
 
-**Server** — Node.js 20, TypeScript 5.4, Express 4.19, Socket.io 4.7, uuid, dotenv, cors
+**Server** — Node.js 22 LTS, TypeScript 5.4, Express 4.19, Socket.io 4.7, uuid, dotenv, cors
 
 ## Project structure
 
@@ -68,7 +68,7 @@ raja-mantri-chor-sipahi/
 
 ## Local development
 
-**Prerequisites:** Node.js 20 or newer and npm.
+**Prerequisites:** Node.js 22 LTS and npm.
 
 ```bash
 # 1. Server
@@ -113,19 +113,24 @@ To play locally, open four browser tabs (or four devices on your network — set
 
 ### Server → Railway
 
-1. Create a new Railway project from this repository.
-2. In the service settings set **Root Directory** to `server`.
-3. Build command: `npm install && npm run build` — Start command: `npm start`.
-4. Add the variable `CLIENT_URL` = your Vercel URL (e.g. `https://raja-mantri.vercel.app`). Railway provides `PORT`.
-5. Deploy, then check `https://<your-railway-domain>/health` returns `{"status":"ok"}`.
+1. Create a Railway project → **Deploy from GitHub repo** → pick this repository.
+2. Service **Settings → Source → Root Directory**: `/server`.
+3. Service **Settings → Config-as-code → Railway Config File**: `/server/railway.json`
+   (Railway does not look inside the root directory for this file). It sets the build
+   (`npm run build`), start (`npm start`) and health check (`/health`).
+4. **Variables**: `CLIENT_URL` = your Vercel URL. For the very first deploy (before Vercel exists) use
+   `http://localhost:5173` and change it later. Do not set `PORT`; Railway provides it.
+5. **Settings → Networking → Generate Domain**, then check `https://<domain>/health` returns `{"status":"ok"}`.
 
-Game state lives in memory, so run a **single instance** (rooms are lost on restart or redeploy).
+Node 22 LTS is selected from `engines` in `server/package.json`. Game state lives in memory, so keep a
+**single replica** (rooms are lost on restart or redeploy).
 
 ### Client → Vercel
 
-1. Import the repository into Vercel.
-2. Set **Root Directory** to `client`. Vercel detects Vite (build `npm run build`, output `dist`).
-3. Add the environment variable `VITE_SERVER_URL` = your Railway URL.
+1. **Add New → Project** → import this repository.
+2. **Root Directory**: `client`. Vercel detects Vite (build `npm run build`, output `dist`).
+3. **Environment Variables**: `VITE_SERVER_URL` = your Railway URL (e.g. `https://xxx.up.railway.app`, no trailing slash).
+   It is baked in at build time, so redeploy after changing it.
 4. Deploy. `client/vercel.json` rewrites all routes to `index.html` so `/lobby` and `/game` survive a refresh.
 
-After both are live, make sure the server's `CLIENT_URL` exactly matches the Vercel URL, then redeploy the server if you changed it.
+After both are live, set the server's `CLIENT_URL` to the exact Vercel URL (comma-separate extra origins such as a custom domain) and redeploy the server.
